@@ -1,0 +1,111 @@
+---
+title: "Practical Machine Leaarning"
+author: "Astha Agarwal"
+date: "10/23/2020"
+output: html_document
+---
+
+Background
+----------
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to predict the manner in which they did the exercise. This is the `classe` variable in the training set, considering any of the other variables as predictors.
+
+
+
+
+
+
+```{r}
+library(caret)
+library(knitr)
+library(data.table)
+library(rpart.plot)
+library(rpart)
+library(gbm)
+library(ggplot2)
+library(corrplot)
+```
+
+Exploring and cleaning the data.
+
+```{r}
+teU <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+taU  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+ts <- read.csv(url(teU))
+dt <- read.csv(url(taU))
+```
+
+In this step we would be cleaning the data.
+```{r}
+tdat <- dt[, colSums(is.na(dt)) == 0]
+testda <- ts[, colSums(is.na(ts)) == 0]
+```
+
+Next step is prediction of the data. So 30% is used for testing our dataset and 70% for training the set we are using in this project.
+
+```{r}
+tdat <- tdat[, -c(1:7)]
+testda <- testda[, -c(1:7)]
+dim(tdat)
+```
+in this step we are deleting the variables that are non-zero referred to as 'nz' in this code
+```{r}
+set.seed(1234)
+dtrain <- createDataPartition(dt$classe, p = 0.7, list = FALSE)
+tdat <- tdat[dtrain, ]
+testda <- tdat[-dtrain, ]
+dim(tdat)
+dim(testda)
+```
+
+```{r}
+nZ <- nearZeroVar(tdat)
+tdat <- tdat[, -nZ]
+testda <- testda[, -nZ]
+dim(tdat)
+dim(testda)
+```
+
+```{r}
+p_cor <- cor(tdat[, -53])
+corrplot(p_cor, order = "FPC", method = "color", type = "upper", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+the corr. predic. are with the dark colour intersec.This is the observation in this case.
+
+Next step is the building of our model for the dataset we are using.
+The Algorithms we will be using are trees and random forests for the prediction part.
+
+```{r}
+set.seed(20000)
+tr <- rpart(classe ~ ., data=tdat, method = "class")
+rpart.plot(tr)
+```
+
+Validation of the model
+```{r}
+modp <- predict(tr, testda, type = "class")
+ab <- confusionMatrix(modp, testda$classe)
+ab
+```
+
+```{r}
+plot(modp)
+```
+
+Lets apply two models in this case:
+First is General boosted model.
+Second is gbm model.
+
+```{r}
+set.seed(10000)
+cand_gbm <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+val <- train(classe ~ .,data=tdat, method = "gbm", trControl = cand_gbm, verbose = FALSE)
+val$finalModel
+```
+
+Conclusion
+----------
+
+We can conclude by saying that RandomForest gives more accurate results than Decision Tree. Hence, for this problem we use RandomForest to predict the manner in which the participants did the exercise.
+
